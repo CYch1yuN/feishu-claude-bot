@@ -1,0 +1,11 @@
+name = "feishu-claude-bot"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+[vars]
+# 飞书应用凭证
+FEISHU_APP_ID = "your-app-id"
+FEISHU_APP_SECRET = "your-app-secret"
+# Claude API 配置
+CLAUDE_API_KEY = "your-claude-api-key"
+CLAUDE_MODEL = "claude-sonnet-4-20250514"

@@ -1,12 +1,16 @@
 export interface Env {
   FEISHU_APP_ID: string;
   FEISHU_APP_SECRET: string;
-  CLAUDE_API_KEY: string;
-  CLAUDE_MODEL: string;
+  MINIMAX_API_KEY: string;
+  MINIMAX_MODEL: string;
+  MINIMAX_GROUP_ID: string;
 }
 
 // 飞书 API 基础 URL
 const FEISHU_API_BASE = "https://open.feishu.cn/open-apis";
+
+// MiniMax API 基础 URL
+const MINIMAX_API_BASE = "https://api.minimax.chat/v1/text";
 
 // 获取飞书访问令牌
 async function getFeishuAccessToken(env: Env): Promise<string> {
@@ -26,35 +30,41 @@ async function getFeishuAccessToken(env: Env): Promise<string> {
   return data.tenant_access_token;
 }
 
-// 调用 Claude API
-async function callClaudeAPI(message: string, env: Env): Promise<string> {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+// 调用 MiniMax API
+async function callMiniMaxAPI(message: string, env: Env): Promise<string> {
+  const response = await fetch(`${MINIMAX_API_BASE}/chatcompletion_v2`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": env.CLAUDE_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
+      Authorization: `Bearer ${env.MINIMAX_API_KEY}`,
     },
     body: JSON.stringify({
-      model: env.CLAUDE_MODEL || "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+      model: env.MINIMAX_MODEL || "abab6.5s-chat",
       messages: [
         {
           role: "user",
           content: message,
         },
       ],
+      tokens_to_generate: 4096,
+      temperature: 0.7,
+      top_p: 0.95,
     }),
   });
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Claude API error: ${error}`);
+    throw new Error(`MiniMax API error: ${error}`);
   }
 
   const data = await response.json();
-  return data.content[0].text;
+
+  // MiniMax API 返回格式
+  if (data.base_resp && data.base_resp.status_msg === "Success") {
+    return data.choices[0].message.content;
+  } else {
+    throw new Error(`MiniMax API error: ${JSON.stringify(data)}`);
+  }
 }
 
 // 发送消息到飞书
@@ -134,8 +144,8 @@ export default {
           const messageContent = JSON.parse(body.event.content).text;
 
           if (senderId && messageContent) {
-            // 调用 Claude API
-            const reply = await callClaudeAPI(messageContent, env);
+            // 调用 MiniMax API
+            const reply = await callMiniMaxAPI(messageContent, env);
 
             // 发送回复
             await sendFeishuMessage(accessToken, senderId, "text", { text: reply });
@@ -153,7 +163,7 @@ export default {
     if (url.pathname === "/" || url.pathname === "/usage") {
       return new Response(
         JSON.stringify({
-          message: "飞书 Claude 机器人",
+          message: "飞书 MiniMax AI 机器人",
           usage: "在飞书中向机器人发送消息即可获得回复",
           endpoints: {
             health: "/health",
